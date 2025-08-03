@@ -1,13 +1,14 @@
 # java_checker.py
 
 import os
+import sys
 import platform
 import shutil
-import tarfile
-import zipfile
 import requests
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from main import main as main_menu
 
-ADOPTIUM_API = "https://api.adoptium.net/v3/binary/latest/{version}/ga/{os}/x64/jdk/hotspot/normal/{archive_type}/jdk"
+ADOPTIUM_API = "https://api.adoptium.net/v3/installer/latest/{version}/ga/{os}/x64/jdk/hotspot/normal/eclipse"
 
 def znajdz_zainstalowane_java():
     system = platform.system()
@@ -52,18 +53,27 @@ def pobierz_i_zainstaluj_java(wersja):
     system = platform.system()
     if system == "Windows":
         os_name = "windows"
-        archive_type = "zip"
-        install_dir = "C:\\Program Files\\Java"
+        archive_type = "msi"
     elif system == "Linux":
         os_name = "linux"
         archive_type = "tar.gz"
-        install_dir = "/usr/lib/jvm"
+    elif system == "Darwin":
+        os_name = "mac"
+        archive_type = "pkg"
     else:
         print("Niestety, system nie jest wspierany.")
         return
 
-    url = ADOPTIUM_API.format(version=wersja, os=os_name, archive_type=archive_type)
+    url = ADOPTIUM_API.format(version=wersja, os=os_name)
+    downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+    if not os.path.exists(downloads_folder):
+        os.makedirs(downloads_folder)
+
+    nazwa_pliku = f"jdk-{wersja}.{archive_type}"
+    pelna_sciezka = os.path.join(downloads_folder, nazwa_pliku)
+
     print(f"Pobieranie Java {wersja} z:\n{url}")
+    print(f"Do pliku: {pelna_sciezka}")
 
     try:
         response = requests.get(url, stream=True)
@@ -71,40 +81,29 @@ def pobierz_i_zainstaluj_java(wersja):
             print("Nie udało się pobrać Javy. Sprawdź wersję lub połączenie internetowe.")
             return
 
-        nazwa_pliku = f"jdk-{wersja}.{archive_type}"
-        with open(nazwa_pliku, 'wb') as f:
+        with open(pelna_sciezka, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        print("Pobrano. Rozpakowywanie...")
-
-        if not os.path.exists(install_dir):
-            os.makedirs(install_dir)
-
-        if archive_type == "zip":
-            with zipfile.ZipFile(nazwa_pliku, 'r') as zip_ref:
-                zip_ref.extractall(install_dir)
-        else:  # tar.gz
-            with tarfile.open(nazwa_pliku, "r:gz") as tar_ref:
-                tar_ref.extractall(install_dir)
-
-        print(f"Pomyślnie zainstalowano Java {wersja} do {install_dir}")
-        os.remove(nazwa_pliku)
+        print(f"Instalator Java {wersja} został pobrany w katalogu {downloads_folder}")
+        main()
 
     except Exception as e:
-        print(f"Błąd podczas instalacji: {e}")
+        print(f"Błąd podczas pobierania: {e}")
+        main()
 
 def pokaz_menu():
     print("\nCo chcesz zrobić:")
     print("1. Powrót do menu")
-    print("2. Zainstaluj JAVA")
+    print("2. Pobierz instalator JAVA")
 
     wybor = input("Wybierz opcję (1/2): ")
     if wybor == "1":
         print("Powrót do menu...")
+        main_menu()
     elif wybor == "2":
         try:
-            wersja = int(input("Podaj wersję Java do instalacji (od 8 do 24): "))
+            wersja = int(input("Podaj wersję Java do pobrania (od 8 do 24): "))
             if wersja < 8 or wersja > 24:
                 print("Niepoprawna wersja. Musi być od 8 do 24.")
                 return
